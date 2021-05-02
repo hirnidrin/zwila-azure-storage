@@ -1,10 +1,10 @@
 {
   "name": "zwila-azure-storage",
   "version": "0.1.0",
-  "description": "Use an Azure Storage blob container and table as backend for anonymous file distribution.",
-  "main": "src/zwila.js",
+  "description": "Use an Azure Storage Account (ASA) as backend for anonymous (but targeted and restricted) file distribution.",
+  "main": "src/zwila.mjs",
   "scripts": {
-    "test": "standard && echo \"Error: no test specified\" && exit 1"
+    "test": "standard && ava --verbose"
   },
   "repository": {
     "type": "git",
@@ -16,11 +16,19 @@
     "url": "https://github.com/hirnidrin/zwila-azure-storage/issues"
   },
   "homepage": "https://github.com/hirnidrin/zwila-azure-storage#readme",
-  "devDependencies": {
-    "standard": "^16.0.3"
-  },
   "dependencies": {
     "@azure/storage-blob": "^12.5.0",
-    "blocklift": "^1.0.1"
+    "nanoid": "^3.1.22"
+  },
+  "devDependencies": {
+    "ava": "^3.15.0",
+    "dotenv": "^8.2.0",
+    "standard": "^16.0.3"
+  },
+  "ava": {
+    "files": [
+      "test/ava/**/*.js",
+      "test/ava/**/*.mjs"
+    ]
   }
 }
