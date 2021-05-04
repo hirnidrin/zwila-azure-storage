@@ -3,7 +3,8 @@ import { nanoid } from 'nanoid'
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 // now do the CommonJS module imports
-const { BlobServiceClient, StorageSharedKeyCredential } = require('@azure/storage-blob')
+const { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob')
+const util = require('./util.js')
 
 class Zwila {
   /**
@@ -33,10 +34,10 @@ class Zwila {
   /**
    * Create a folder - Store its meta info as a application/json object, to pathname: foldername/foldermeta.json.
    *
-   * @param {String?} options.foldername - defaults to nanoid() of len 21, eg: '2uT_9rJpk5T8-UCUBLFtJ'
-   * @param {Date|String?} options.expiry - Date object or ISO string, defaults to 31 days from now
-   * @param {String?} options.note - defaults to empty
-   *
+   * @param {Object=} options - folder properties
+   * @param {String=} options.foldername - defaults to nanoid() of len 21, eg: '2uT_9rJpk5T8-UCUBLFtJ'
+   * @param {Date|String=} options.expiry - Date object or ISO string, defaults to 31 days from now
+   * @param {String=} options.note - defaults to empty string
    * @returns {Promise<Object>}
    *  {
    *    foldermeta: { foldername: {String}, expiry: {String}, note: {String}, downloads: 0 },
@@ -53,7 +54,7 @@ class Zwila {
       d.setDate(d.getDate() + 31)
       params.expiry = d.toISOString()
     } else {
-      params.expiry = new Date(options.expiry).toISOString() // make an ISO string of either incoming Date or String
+      params.expiry = new Date(options.expiry).toISOString() // make an ISO string of incoming Date or String
     }
     params.note = options.note ? options.note : ''
     params.downloads = 0
@@ -66,9 +67,30 @@ class Zwila {
       }
     } // https://docs.microsoft.com/en-us/javascript/api/@azure/storage-blob/blockblobuploadoptions?view=azure-node-latest
     const res = await blockBlobClient.upload(content, content.length, blockBlobUploadOptions)
-    res.url = decodeURIComponent(blockBlobClient.url) // bbc has the blob path encoded, eg "/"" -> "%2F", undo this
-    res.foldermeta = params
-    return res
+    const url = decodeURIComponent(blockBlobClient.url) // bbc has the blob path encoded, eg "/"" -> "%2F", undo this
+    const foldermeta = params
+    return { foldermeta: foldermeta, url: url, serverResponse: res }
+  }
+
+  /**
+   * Upload a file to a folder.
+   *
+   * @param {String} sourcepath - local path to the file to be uploaded
+   * @param {String} foldername - target zwila folder
+   * @param {String} filename - name of file created in zwila folder
+   * @returns {Promise<BlobUploadCommonResponse>} - Azure SDK response
+   */
+  async uploadFile (sourcepath, foldername, filename) {
+    const filetype = await util.getContentTypeFromFile(sourcepath)
+    const blockBlobClient = this.containerClient.getBlockBlobClient(`${foldername}/${filename}`)
+    const blockBlobUploadOptions = {
+      blobHTTPHeaders: {
+        blobContentType: filetype
+      }
+    } // https://docs.microsoft.com/en-us/javascript/api/@azure/storage-blob/blockblobuploadoptions?view=azure-node-latest
+    const res = await blockBlobClient.uploadFile(sourcepath, blockBlobUploadOptions)
+    const url = decodeURIComponent(blockBlobClient.url) // bbc has the blob path encoded, eg "/"" -> "%2F", undo this
+    return { url: url, serverResponse: res }
   }
 
   /**
@@ -106,7 +128,7 @@ class Zwila {
   /**
    * List foldermeta and contained blobs for each (or one) folder within container.
    *
-   * @param {String?} foldername - optional, limit list to this one folder only
+   * @param {String=} foldername - optional, limit list to this one folder only
    * @returns {Promise<Array>} - of objects { foldermeta: { }, folderblobs: [ {}, {}, .. ] }
    */
   async listFolders (foldername = null) {
@@ -123,6 +145,27 @@ class Zwila {
       }
     }
     return folders
+  }
+
+  /**
+   * Create a short-lived Shared Access Signature (SAS) URL for the given blob.
+   *
+   * @param {String} foldername
+   * @param {String} filename
+   * @returns {String} - SAS URL
+   */
+  async getSASUrl (foldername, filename) {
+    const blobname = `${foldername}/${filename}`
+    const sastoken = generateBlobSASQueryParameters({
+      containerName: this.containerClient.containerName,
+      blobName: blobname,
+      startsOn: new Date(new Date().valueOf() - 10 * 60 * 1000), // 10 mins ago, tolerate eventual clock misalignment
+      expiresOn: new Date(new Date().valueOf() + 60 * 60 * 1000), // link valid for 60 mins
+      permissions: BlobSASPermissions.parse('r')
+    }, this.containerClient.credential)
+    const blockBlobClient = this.containerClient.getBlockBlobClient(blobname)
+    const url = decodeURIComponent(blockBlobClient.url) // bbc has the blob path encoded, eg "/"" -> "%2F", undo this
+    return `${url}?${sastoken}`
   }
 
   /**
