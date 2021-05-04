@@ -4,8 +4,6 @@ import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 // now do the CommonJS module imports
 const test = require('ava')
-// const path = require('path')
-// const fs = require('fs')
 const { ContainerClient } = require('@azure/storage-blob')
 
 require('dotenv').config()
