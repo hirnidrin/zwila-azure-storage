@@ -18,6 +18,8 @@
   "homepage": "https://github.com/hirnidrin/zwila-azure-storage#readme",
   "dependencies": {
     "@azure/storage-blob": "^12.5.0",
+    "file-type": "^16.3.0",
+    "is-binary-path": "^2.1.0",
     "nanoid": "^3.1.22"
   },
   "devDependencies": {

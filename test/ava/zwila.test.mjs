@@ -4,6 +4,8 @@ import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 // now do the CommonJS module imports
 const test = require('ava')
+// const path = require('path')
+// const fs = require('fs')
 const { ContainerClient } = require('@azure/storage-blob')
 
 require('dotenv').config()
@@ -21,6 +23,11 @@ test.before(t => {
   }
   // set expiry date to one day from now, see https://stackoverflow.com/a/9989458
   t.context.testfolder.expiry.setDate(t.context.testfolder.expiry.getDate() + 1)
+  // relative path to local testfile
+  t.context.testfile = {
+    localpath: '../rhino.png',
+    blobfilename: 'Northern_White_Rhino.png'
+  }
 })
 
 test.serial('ZWILA_ env vars are set?', t => {
@@ -43,19 +50,29 @@ test.serial('create a folder with our t.context.testfolder params', async t => {
     foldermeta: { downloads: 0 },
     url: `https://${t.context.endpoint.account}.blob.core.windows.net/${t.context.endpoint.container}/${t.context.testfolder.foldername}/foldermeta.json`
   })
+  t.truthy(res.serverResponse)
 })
 
-test.serial('create a folder with omitted params', async t => {
+test.serial.skip('create a folder with omitted params', async t => {
   const z = new Zwila(t.context.endpoint)
   const res = await z.createFolder()
   t.like(res, {
     foldermeta: { note: '', downloads: 0 },
     url: `https://${t.context.endpoint.account}.blob.core.windows.net/${t.context.endpoint.container}/${res.foldermeta.foldername}/foldermeta.json`
   })
+  t.truthy(res.serverRespose)
   // check if expiry date is 31 days in the future (omit time)
   const d = new Date()
   d.setDate(d.getDate() + 31)
   t.is(res.foldermeta.expiry.slice(0, 10), d.toISOString().slice(0, 10))
+})
+
+test.serial('upload the test file to the test folder', async t => {
+  const z = new Zwila(t.context.endpoint)
+  const testfileurl = new URL(t.context.testfile.localpath, import.meta.url) // use this trick to convert relative path to absolute path
+  const res = await z.uploadFile(testfileurl.pathname, t.context.testfolder.foldername, t.context.testfile.blobfilename)
+  t.is(res.url, `https://${t.context.endpoint.account}.blob.core.windows.net/${t.context.endpoint.container}/${t.context.testfolder.foldername}/${t.context.testfile.blobfilename}`)
+  t.truthy(res.serverResponse)
 })
 
 test('get the foldermeta of the test folder', async t => {
@@ -73,7 +90,7 @@ test('list blobs within the test folder', async t => {
   const blobs = await z.listFolderBlobs(t.context.testfolder.foldername)
   // console.log(blobs)
   t.true(Array.isArray(blobs))
-  t.true(blobs.length >= 0) // foldermeta.json must not appear
+  t.true(blobs.length >= 1) // foldermeta.json must not appear
 })
 
 test('list all folders (meta and contained blobs of each)', async t => {
@@ -86,8 +103,18 @@ test('list all folders (meta and contained blobs of each)', async t => {
 
 test('list the test folder (meta and contained blobs)', async t => {
   const z = new Zwila(t.context.endpoint)
-  const folders = await z.listFolders()
-  t.true(folders.length >= 2)
+  const folders = await z.listFolders(t.context.testfolder.foldername)
+  t.true(folders.length === 1)
   t.truthy(folders[0].foldermeta)
   t.true(Array.isArray(folders[0].folderblobs))
+})
+
+test('generate SAS URL on test file in the test folder', async t => {
+  const z = new Zwila(t.context.endpoint)
+  const res = await z.getSASUrl(t.context.testfolder.foldername, t.context.testfile.blobfilename)
+  // console.log(res)
+  const url = res.split('?')[0]
+  const token = res.split('?')[1]
+  t.is(url, `https://${t.context.endpoint.account}.blob.core.windows.net/${t.context.endpoint.container}/${t.context.testfolder.foldername}/${t.context.testfile.blobfilename}`)
+  t.regex(token, /.*sp=r&.*sig=.+$/)
 })
