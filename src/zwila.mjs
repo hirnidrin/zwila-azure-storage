@@ -19,6 +19,7 @@ class Zwila {
     this.blobServiceClient = new BlobServiceClient(`https://${options.account}.blob.core.windows.net`, sharedKeyCredential)
     this.containerClient = this.blobServiceClient.getContainerClient(options.container) // holds account and container props, see
     // https://docs.microsoft.com/en-us/javascript/api/@azure/storage-blob/containerclient?view=azure-node-latest
+    this.metafilename = '_zwila.md'
   }
 
   /**
@@ -32,57 +33,59 @@ class Zwila {
   }
 
   /**
-   * Create a folder - Store its meta info as a application/json object, to pathname: foldername/foldermeta.json.
+   * Create a folder - Store meta info in a text/markdown file within the folder.
    *
-   * @param {Object=} options - folder properties
-   * @param {String=} options.foldername - defaults to nanoid() of len 21, eg: '2uT_9rJpk5T8-UCUBLFtJ'
-   * @param {Date|String=} options.expiry - Date object or ISO string, defaults to 31 days from now
-   * @param {String=} options.note - defaults to empty string
+   * @param {String=} slug - foldername, defaults to nanoid() of len 21, eg: '2uT_9rJpk5T8-UCUBLFtJ'
+   * @param {String=} description - internal description, defaults to empty string
+   * @param {Date|String=} expiry - Date object or ISO string, defaults to 31 days from now
+   * @param {String=} message - remark formatted message to be shown to recipient of downloads
    * @returns {Promise<Object>}
    *  {
-   *    foldermeta: { foldername: {String}, expiry: {String}, note: {String}, downloads: 0 },
+   *    markdown: string with TOML frontmatter holding the meta info, remark as message
    *    url: 'of created blob',
    *    serverResponse: { of Azure SDK }
    *  }
    */
-  async createFolder (options = {}) {
-    const params = {}
-    params.foldername = options.foldername ? options.foldername : nanoid()
-    if (!options.expiry) {
-      // no expiry date specified -> default is 31 days (one month)
-      const d = new Date()
-      d.setDate(d.getDate() + 31)
-      params.expiry = d.toISOString()
+  async createFolder (slug = null, description = null, expiry = null, message = null) {
+    if (!slug) slug = nanoid()
+    if (!description) description = ''
+    if (!expiry) {
+      expiry = new Date(new Date().valueOf() + 31 * 24 * 60 * 60 * 1000).toISOString() // 31 days from now
     } else {
-      params.expiry = new Date(options.expiry).toISOString() // make an ISO string of incoming Date or String
+      expiry = new Date(expiry).toISOString() // convert any incoming date type to a string representation
     }
-    params.note = options.note ? options.note : ''
-    params.downloads = 0
-    // upload content as foldername/foldermeta.json -> creates the "folder"
-    const content = JSON.stringify(params)
-    const blockBlobClient = this.containerClient.getBlockBlobClient(`${params.foldername}/foldermeta.json`)
+    let md = `+++
+slug = '${slug}'
+description = '${description}'
+expiry = ${expiry}
+downloads = 0
++++
+`
+    if (message) md += `\n${message}\n`
+
+    // upload content as slug/this.metafilename -> creates the "folder"
+    const blockBlobClient = this.containerClient.getBlockBlobClient(`${slug}/${this.metafilename}`)
     const blockBlobUploadOptions = {
       blobHTTPHeaders: {
-        blobContentType: 'application/json'
+        blobContentType: 'text/markdown; charset=UTF-8'
       }
     } // https://docs.microsoft.com/en-us/javascript/api/@azure/storage-blob/blockblobuploadoptions?view=azure-node-latest
-    const res = await blockBlobClient.upload(content, content.length, blockBlobUploadOptions)
+    const res = await blockBlobClient.upload(md, md.length, blockBlobUploadOptions)
     const url = decodeURIComponent(blockBlobClient.url) // bbc has the blob path encoded, eg "/"" -> "%2F", undo this
-    const foldermeta = params
-    return { foldermeta: foldermeta, url: url, serverResponse: res }
+    return { markdown: md, url: url, serverResponse: res }
   }
 
   /**
    * Upload a file to a folder.
    *
    * @param {String} sourcepath - local path to the file to be uploaded
-   * @param {String} foldername - target zwila folder
+   * @param {String} slug - target zwila folder
    * @param {String} filename - name of file created in zwila folder
-   * @returns {Promise<BlobUploadCommonResponse>} - Azure SDK response
+   * @returns {Promise<Object>} - { url: 'blob url', serverResponse: { Azure SDK response } }
    */
-  async uploadFile (sourcepath, foldername, filename) {
+  async uploadFile (sourcepath, slug, filename) {
     const filetype = await util.getContentTypeFromFile(sourcepath)
-    const blockBlobClient = this.containerClient.getBlockBlobClient(`${foldername}/${filename}`)
+    const blockBlobClient = this.containerClient.getBlockBlobClient(`${slug}/${filename}`)
     const blockBlobUploadOptions = {
       blobHTTPHeaders: {
         blobContentType: filetype
@@ -98,27 +101,27 @@ class Zwila {
    *
    * @see https://docs.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-nodejs#download-blobs
    *
-   * @param {String} foldername - name of the top-level folder (= first path element) within the container
-   * @returns {Promise<Object>} - { foldername: {String}, expiry: {String}, note: {String}, downloads: {Int} }
+   * @param {String} slug - name of the top-level folder (= first path element) within the container
+   * @returns {Promise<String>} - content of this.metafilename file: toml meta + remark message
    */
-  async getFolderMeta (foldername) {
-    const blockBlobClient = this.containerClient.getBlockBlobClient(`${foldername}/foldermeta.json`)
+  async getFolderMeta (slug) {
+    const blockBlobClient = this.containerClient.getBlockBlobClient(`${slug}/${this.metafilename}`)
     // see https://docs.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-nodejs#download-blobs
-    const downloadBlockBlobResponse = await blockBlobClient.download(0)
-    const json = await this.streamToString(downloadBlockBlobResponse.readableStreamBody)
-    return JSON.parse(json)
+    const downloadBlockBlobResponse = await blockBlobClient.download()
+    const md = await this.streamToString(downloadBlockBlobResponse.readableStreamBody)
+    return md
   }
 
   /**
    * List a folder's blobs.
    *
-   * @param {String} foldername - the substring preceeding the first "/" in the blob path
+   * @param {String} slug - the substring preceeding the first "/" in the blob path
    * @returns {Promise<Array>} - of blob metadata objects
    */
-  async listFolderBlobs (foldername) {
+  async listFolderBlobs (slug) {
     const blobs = []
-    for await (const item of this.containerClient.listBlobsByHierarchy('/', { prefix: `${foldername}/` })) {
-      if (item.kind === 'blob' && !item.name.includes('foldermeta.json')) {
+    for await (const item of this.containerClient.listBlobsByHierarchy('/', { prefix: `${slug}/` })) {
+      if (item.kind === 'blob' && !item.name.includes(this.metafilename)) {
         blobs.push(item)
       }
     }
@@ -126,22 +129,22 @@ class Zwila {
   }
 
   /**
-   * List foldermeta and contained blobs for each (or one) folder within container.
+   * List meta and blobs of each (or only one) folder within container.
    *
-   * @param {String=} foldername - optional, limit list to this one folder only
-   * @returns {Promise<Array>} - of objects { foldermeta: { }, folderblobs: [ {}, {}, .. ] }
+   * @param {String=} slug - optional, limit list to this one folder only
+   * @returns {Promise<Array>} - of objects { markdown: { }, blobs: [ {}, {}, .. ] }
    */
-  async listFolders (foldername = null) {
+  async listFolders (slug = null) {
     const folders = []
     for await (const item of this.containerClient.listBlobsByHierarchy('/')) {
       if (item.kind === 'prefix') {
         const f = item.name.slice(0, -1) // chop off the trailing "/"
-        if (foldername && (f !== foldername)) {
+        if (slug && (f !== slug)) {
           continue // we just want one folder, but it is not the current one
         }
         const meta = await this.getFolderMeta(f)
         const blobs = await this.listFolderBlobs(f)
-        folders.push({ foldermeta: meta, folderblobs: blobs })
+        folders.push({ markdown: meta, blobs: blobs })
       }
     }
     return folders
@@ -150,12 +153,12 @@ class Zwila {
   /**
    * Create a short-lived Shared Access Signature (SAS) URL for the given blob.
    *
-   * @param {String} foldername
+   * @param {String} slug
    * @param {String} filename
    * @returns {String} - SAS URL
    */
-  async getSASUrl (foldername, filename) {
-    const blobname = `${foldername}/${filename}`
+  async getSASUrl (slug, filename) {
+    const blobname = `${slug}/${filename}`
     const sastoken = generateBlobSASQueryParameters({
       containerName: this.containerClient.containerName,
       blobName: blobname,

@@ -12,7 +12,7 @@ npm package to manage and use a single container of an Azure Storage Account (AS
 * Each folder may contain a number of blobs.
 
 ### Access control
-* The package facilitates building an API that acts as a proxy for access control on folder level.
+* The package facilitates building a proxy webservice for access control on folder level.
   * The ASA container does not need to allow public anonymous access.
   * The package authenticates to the ASA with an access key. 
 * On download requests, the proxy generates a short-lived Shared Access Signature (SAS) URL and gives it to the client, which downloads the blob straight from the ASA.
@@ -27,7 +27,7 @@ npm package to manage and use a single container of an Azure Storage Account (AS
 
 ## Usage, API
 
-Todo. For now, study and run the unit tests to find out how it works.
+Todo. For now, study and run the unit tests to see how it works.
 
 ## Run unit tests
 To run the tests in the `test/ava` directory
