@@ -33,13 +33,6 @@ downloads = 0
 
 ${t.context.testfolder.message}
 `
-  t.context.testfolderii = {
-    foldername: 'zwila-test',
-    expiry: new Date(),
-    note: 'Test folder created by AVA test runner.'
-  }
-  // set expiry date to one day from now, see https://stackoverflow.com/a/9989458
-  t.context.testfolderii.expiry.setDate(t.context.testfolderii.expiry.getDate() + 1)
   // relative path to local testfile
   t.context.testfile = {
     localpath: '../rhino.png',
