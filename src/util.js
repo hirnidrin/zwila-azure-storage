@@ -1,6 +1,8 @@
 /**
  * Helpers for file handling.
  *
+ * @author hirnidrin - 20210705 - Add text/markdown MIME type.
+ *
  * @author Julie Ng https://github.com/julie-ng
  * @see https://github.com/julie-ng/blocklift-js/blob/master/source/util.js
  */
@@ -10,7 +12,8 @@ const isBinaryPath = require('is-binary-path')
 const textMimeTypes = {
   txt: 'text/plain',
   xml: 'text/xml',
-  csv: 'text/csv'
+  csv: 'text/csv',
+  md: 'text/markdown; charset=UTF-8'
 }
 
 function _getFilename (filepath) {
