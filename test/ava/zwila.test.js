@@ -1,13 +1,10 @@
-import { Zwila } from '../../src/zwila.mjs'
-import remark from 'remark'
-import remarkFrontmatter from 'remark-frontmatter'
-// make CommonJS work (module.exports and require) in ES6 modules, see https://stackoverflow.com/a/61947868
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
-// now do the CommonJS module imports
+const Zwila = require('../../src/zwila.js')
+const remark = require('remark')
+const remarkFrontmatter = require('remark-frontmatter')
 const test = require('ava')
 const { ContainerClient } = require('@azure/storage-blob')
 const TOML = require('@iarna/toml')
+const path = require('path')
 
 require('dotenv').config()
 
@@ -84,8 +81,8 @@ test.serial('create a folder with omitted params', async t => {
 
 test.serial('upload the test file to the test folder', async t => {
   const z = new Zwila(t.context.endpoint)
-  const testfileurl = new URL(t.context.testfile.localpath, import.meta.url) // use this trick to convert relative path to absolute path
-  const res = await z.uploadFile(testfileurl.pathname, t.context.testfolder.slug, t.context.testfile.blobfilename)
+  const testfilepath = path.resolve(__dirname, t.context.testfile.localpath)
+  const res = await z.uploadFile(testfilepath, t.context.testfolder.slug, t.context.testfile.blobfilename)
   t.is(res.url, `https://${t.context.endpoint.account}.blob.core.windows.net/${t.context.endpoint.container}/${t.context.testfolder.slug}/${t.context.testfile.blobfilename}`)
   t.truthy(res.serverResponse)
 })

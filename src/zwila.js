@@ -1,8 +1,4 @@
-import { nanoid } from 'nanoid'
-// make CommonJS work (module.exports and require) in ES6 modules, see https://stackoverflow.com/a/61947868
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
-// now do the CommonJS module imports
+const nanoid = require('nanoid')
 const { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob')
 const util = require('./util.js')
 
@@ -47,7 +43,7 @@ class Zwila {
    *  }
    */
   async createFolder (slug = null, description = null, expiry = null, message = null) {
-    if (!slug) slug = nanoid()
+    if (!slug) slug = nanoid.nanoid()
     if (!description) description = ''
     if (!expiry) {
       expiry = new Date(new Date().valueOf() + 31 * 24 * 60 * 60 * 1000).toISOString() // 31 days from now
@@ -193,4 +189,4 @@ downloads = 0
   }
 }
 
-export { Zwila }
+module.exports = Zwila
