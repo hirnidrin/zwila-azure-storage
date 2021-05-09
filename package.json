@@ -2,7 +2,7 @@
   "name": "zwila-azure-storage",
   "version": "0.1.0",
   "description": "Use an Azure Storage Account (ASA) as backend for anonymous (but targeted and restricted) file distribution.",
-  "main": "src/zwila.mjs",
+  "main": "src/zwila.js",
   "scripts": {
     "test": "standard && ava --verbose"
   },
@@ -32,8 +32,7 @@
   },
   "ava": {
     "files": [
-      "test/ava/**/*.js",
-      "test/ava/**/*.mjs"
+      "test/ava/**/*.js"
     ]
   }
 }
