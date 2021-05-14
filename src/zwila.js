@@ -37,7 +37,7 @@ class Zwila {
    * @param {String=} message - remark formatted message to be shown to recipient of downloads
    * @returns {Promise<Object>}
    *  {
-   *    markdown: string with TOML frontmatter holding the meta info, remark as message
+   *    meta: string with TOML frontmatter holding meta info, remark as message
    *    url: 'of created blob',
    *    serverResponse: { of Azure SDK }
    *  }
@@ -59,7 +59,7 @@ downloads = 0
 `
     if (message) md += `\n${message}\n`
 
-    // upload content as slug/this.metafilename -> creates the "folder"
+    // upload meta text as slug/this.metafilename -> creates the "folder"
     const blockBlobClient = this.containerClient.getBlockBlobClient(`${slug}/${this.metafilename}`)
     const blockBlobUploadOptions = {
       blobHTTPHeaders: {
@@ -68,7 +68,7 @@ downloads = 0
     } // https://docs.microsoft.com/en-us/javascript/api/@azure/storage-blob/blockblobuploadoptions?view=azure-node-latest
     const res = await blockBlobClient.upload(md, md.length, blockBlobUploadOptions)
     const url = decodeURIComponent(blockBlobClient.url) // bbc has the blob path encoded, eg "/"" -> "%2F", undo this
-    return { markdown: md, url: url, serverResponse: res }
+    return { meta: md, url: url, serverResponse: res }
   }
 
   /**
@@ -98,7 +98,7 @@ downloads = 0
    * @see https://docs.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-nodejs#download-blobs
    *
    * @param {String} slug - name of the top-level folder (= first path element) within the container
-   * @returns {Promise<String>} - content of this.metafilename file: toml meta + remark message
+   * @returns {Promise<String>} - content of this.metafilename file: toml frontmatter + optional remark message
    */
   async getFolderMeta (slug) {
     const blockBlobClient = this.containerClient.getBlockBlobClient(`${slug}/${this.metafilename}`)
@@ -128,7 +128,7 @@ downloads = 0
    * List meta and blobs of each (or only one) folder within container.
    *
    * @param {String=} slug - optional, limit list to this one folder only
-   * @returns {Promise<Array>} - of objects { markdown: { }, blobs: [ {}, {}, .. ] }
+   * @returns {Promise<Array>} - of objects { meta: { }, blobs: [ {}, {}, .. ] }
    */
   async listFolders (slug = null) {
     const folders = []
@@ -140,7 +140,7 @@ downloads = 0
         }
         const meta = await this.getFolderMeta(f)
         const blobs = await this.listFolderBlobs(f)
-        folders.push({ markdown: meta, blobs: blobs })
+        folders.push({ meta: meta, blobs: blobs })
       }
     }
     return folders
@@ -151,15 +151,16 @@ downloads = 0
    *
    * @param {String} slug
    * @param {String} filename
+   * @param {Int=} minutes - SAS lifetime in minutes, defaults to 60
    * @returns {String} - SAS URL
    */
-  async getSASUrl (slug, filename) {
+  async getSASUrl (slug, filename, minutes = 60) {
     const blobname = `${slug}/${filename}`
     const sastoken = generateBlobSASQueryParameters({
       containerName: this.containerClient.containerName,
       blobName: blobname,
       startsOn: new Date(new Date().valueOf() - 10 * 60 * 1000), // 10 mins ago, tolerate eventual clock misalignment
-      expiresOn: new Date(new Date().valueOf() + 60 * 60 * 1000), // link valid for 60 mins
+      expiresOn: new Date(new Date().valueOf() + minutes * 60 * 1000), // expires in: now + minutes
       permissions: BlobSASPermissions.parse('r')
     }, this.containerClient.credential)
     const blockBlobClient = this.containerClient.getBlockBlobClient(blobname)

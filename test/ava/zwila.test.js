@@ -54,10 +54,10 @@ test.serial('create a folder with our t.context.testfolder params', async t => {
   const z = new Zwila(t.context.endpoint)
   const res = await z.createFolder(t.context.testfolder.slug, t.context.testfolder.description, t.context.testfolder.expiry, t.context.testfolder.message)
   // console.log(t.context.testfolder.md)
-  // console.log(res.markdown)
-  // const tree = remark().use(remarkFrontmatter, 'toml').parse(res.markdown)
+  // console.log(res.meta)
+  // const tree = remark().use(remarkFrontmatter, 'toml').parse(res.meta)
   // console.log(tree)
-  t.is(t.context.testfolder.md, res.markdown)
+  t.is(t.context.testfolder.md, res.meta)
   t.is(`https://${t.context.endpoint.account}.blob.core.windows.net/${t.context.endpoint.container}/${t.context.testfolder.slug}/_zwila.md`, res.url)
   t.truthy(res.serverResponse)
 })
@@ -65,11 +65,11 @@ test.serial('create a folder with our t.context.testfolder params', async t => {
 test.serial('create a folder with omitted params', async t => {
   const z = new Zwila(t.context.endpoint)
   const res = await z.createFolder()
-  const tree = remark().use(remarkFrontmatter, 'toml').parse(res.markdown)
+  const tree = remark().use(remarkFrontmatter, 'toml').parse(res.meta)
   const tomlobj = tree.children.find(e => e.type === 'toml') // extract the child object representing the toml frontmatter
   const props = TOML.parse(tomlobj.value) // convert the toml props to a javascript object
   // console.log(res)
-  // console.log(res.markdown)
+  // console.log(res.meta)
   // console.log(tree)
   // console.log(tomlobj.value)
   // console.log(props)
@@ -97,7 +97,7 @@ test('list all folders (meta and blobs of each)', async t => {
   const z = new Zwila(t.context.endpoint)
   const res = await z.listFolders()
   t.true(res.length >= 2)
-  t.truthy(res[0].markdown)
+  t.truthy(res[0].meta)
   t.true(Array.isArray(res[0].blobs))
 })
 
@@ -112,7 +112,7 @@ test('list the test folder (meta and blobs)', async t => {
   const z = new Zwila(t.context.endpoint)
   const res = await z.listFolders(t.context.testfolder.slug)
   t.true(res.length === 1)
-  t.truthy(res[0].markdown)
+  t.truthy(res[0].meta)
   t.true(Array.isArray(res[0].blobs))
 })
 
