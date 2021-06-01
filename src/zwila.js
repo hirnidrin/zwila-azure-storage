@@ -1,6 +1,7 @@
 const nanoid = require('nanoid')
 const { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob')
 const util = require('./util.js')
+const TOML = require('@iarna/toml')
 
 class Zwila {
   /**
@@ -46,7 +47,7 @@ class Zwila {
     if (!slug) slug = nanoid.nanoid()
     if (!description) description = ''
     if (!expiry) {
-      expiry = new Date(new Date().valueOf() + 31 * 24 * 60 * 60 * 1000).toISOString() // 31 days from now
+      expiry = new Date(new Date().getTime() + 31 * 24 * 60 * 60 * 1000).toISOString() // 31 days from now
     } else {
       expiry = new Date(expiry).toISOString() // convert any incoming date type to a string representation
     }
@@ -128,9 +129,10 @@ downloads = 0
    * List meta and blobs of each (or only one) folder within container.
    *
    * @param {String=} slug - optional, limit list to this one folder only
+   * @param {Boolean} withexpired - optional, include expired folders
    * @returns {Promise<Array>} - of objects { meta: { }, blobs: [ {}, {}, .. ] }
    */
-  async listFolders (slug = null) {
+  async listFolders (slug = null, withexpired = false) {
     const folders = []
     for await (const item of this.containerClient.listBlobsByHierarchy('/')) {
       if (item.kind === 'prefix') {
@@ -139,6 +141,15 @@ downloads = 0
           continue // we just want one folder, but it is not the current one
         }
         const meta = await this.getFolderMeta(f)
+        if (!withexpired) {
+          const metaparts = meta.match(/^\+\+\+\s+(.*)\+\+\+\s+(.*)$/s) // [ all matched text, toml, markdown ]
+          const { expiry } = TOML.parse(metaparts[1])
+          const now = new Date()
+          // console.log(`now - expiry = diff: ${now.getTime()} - ${expiry.getTime()} = ${now.getTime() - expiry.getTime()}`)
+          if (now > expiry) {
+            continue // expired, skip this folder
+          }
+        }
         const blobs = await this.listFolderBlobs(f)
         folders.push({ meta: meta, blobs: blobs })
       }
@@ -159,8 +170,8 @@ downloads = 0
     const sastoken = generateBlobSASQueryParameters({
       containerName: this.containerClient.containerName,
       blobName: blobname,
-      startsOn: new Date(new Date().valueOf() - 10 * 60 * 1000), // 10 mins ago, tolerate eventual clock misalignment
-      expiresOn: new Date(new Date().valueOf() + minutes * 60 * 1000), // expires in: now + minutes
+      startsOn: new Date(new Date().getTime() - 10 * 60 * 1000), // 10 mins ago, tolerate eventual clock misalignment
+      expiresOn: new Date(new Date().getTime() + minutes * 60 * 1000), // expires in: now + minutes
       permissions: BlobSASPermissions.parse('r')
     }, this.containerClient.credential)
     const blockBlobClient = this.containerClient.getBlockBlobClient(blobname)
