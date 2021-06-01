@@ -14,7 +14,7 @@ test.before(t => {
     accessKey: process.env.ZWILA_ACCESSKEY,
     container: process.env.ZWILA_CONTAINER
   }
-  const d = new Date(new Date().valueOf() + 1 * 24 * 60 * 60 * 1000) // 1 day from now
+  const d = new Date(new Date().getTime() + 1 * 24 * 60 * 60 * 1000) // 1 day from now
   t.context.testfolder = {
     slug: 'zwila-test',
     description: 'Test folder used by AVA test runner during development.',
@@ -74,7 +74,7 @@ test.serial('create a folder with omitted params', async t => {
   // console.log(tomlobj.value)
   // console.log(props)
   t.is(21, props.slug.length)
-  const d = new Date(new Date().valueOf() + 31 * 24 * 60 * 60 * 1000).toISOString() // 31 days from now
+  const d = new Date(new Date().getTime() + 31 * 24 * 60 * 60 * 1000).toISOString() // 31 days from now
   t.is(d.slice(0, 10), props.expiry.toISOString().slice(0, 10), 'expiry is not 31 days from now') // omit time
   t.truthy(res.serverResponse)
 })
