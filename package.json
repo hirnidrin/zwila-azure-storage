@@ -1,6 +1,6 @@
 {
   "name": "zwila-azure-storage",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Use an Azure Storage Account (ASA) as backend for anonymous (but targeted and restricted) file distribution.",
   "main": "src/zwila.js",
   "scripts": {
@@ -18,12 +18,12 @@
   "homepage": "https://github.com/hirnidrin/zwila-azure-storage#readme",
   "dependencies": {
     "@azure/storage-blob": "^12.5.0",
+    "@iarna/toml": "^2.2.5",
     "file-type": "^16.3.0",
     "is-binary-path": "^2.1.0",
     "nanoid": "^3.1.22"
   },
   "devDependencies": {
-    "@iarna/toml": "^2.2.5",
     "ava": "^3.15.0",
     "dotenv": "^8.2.0",
     "remark": "^13.0.0",
